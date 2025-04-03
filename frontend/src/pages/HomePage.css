@@ -1,0 +1,49 @@
+/* HomePage.css */
+.home-page {
+    padding: 1rem 0;
+  }
+  
+  .home-page h1 {
+    margin-bottom: 0.5rem;
+  }
+  
+  .home-page p {
+    margin-bottom: 2rem;
+    color: #666;
+  }
+  
+  .detectors-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 2rem;
+  }
+  
+  .detector-card {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    transition: transform 0.3s, box-shadow 0.3s;
+  }
+  
+  .detector-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  .detector-card h2 {
+    padding: 1rem 1rem 0.5rem;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  .detector-card p {
+    padding: 0 1rem;
+    margin-bottom: 1rem;
+    color: #666;
+  }
+  
+  @media (max-width: 768px) {
+    .detectors-grid {
+      grid-template-columns: 1fr;
+    }
+  }

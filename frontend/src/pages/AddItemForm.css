@@ -1,0 +1,61 @@
+/* AddItemForm.css */
+.add-item-form {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 2rem;
+  }
+  
+  .form-section {
+    margin-bottom: 2rem;
+  }
+  
+  .form-section h2 {
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+  }
+  
+  .beacon-input {
+    display: flex;
+    gap: 10px;
+  }
+  
+  .beacon-input input {
+    flex: 1;
+  }
+  
+  .validate-btn {
+    background-color: var(--secondary-color);
+  }
+  
+  .image-preview {
+    margin-top: 0.5rem;
+    color: #666;
+  }
+  
+  .form-actions {
+    margin-top: 2rem;
+    display: flex;
+    justify-content: flex-end;
+  }
+  
+  .submit-btn {
+    background-color: var(--accent-color);
+    padding: 10px 20px;
+    font-size: 1.1rem;
+  }
+  
+  .submit-btn:hover {
+    background-color: #40b090;
+  }

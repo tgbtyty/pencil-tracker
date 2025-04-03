@@ -1,0 +1,15 @@
+/* AddItemPage.css */
+.add-item-page {
+    padding: 1rem 0;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  
+  .add-item-page h1 {
+    margin-bottom: 0.5rem;
+  }
+  
+  .add-item-page p {
+    margin-bottom: 2rem;
+    color: #666;
+  }

@@ -1,0 +1,11 @@
+/* DetectorMap.css */
+.detector-map {
+    border-radius: 0 0 8px 8px;
+    overflow: hidden;
+  }
+  
+  .detector-map canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+  }

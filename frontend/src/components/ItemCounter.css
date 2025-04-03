@@ -1,0 +1,18 @@
+/* ItemCounter.css */
+.item-counter {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.5rem 1rem 1rem;
+  }
+  
+  .item-counter .count {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--primary-color);
+  }
+  
+  .item-counter .label {
+    font-size: 0.9rem;
+    color: #666;
+  }
