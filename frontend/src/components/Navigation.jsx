@@ -10,6 +10,9 @@ function Navigation() {
           <Link to="/">Home</Link>
         </li>
         <li>
+          <Link to="/furniture">Inventory</Link>
+        </li>
+        <li>
           <Link to="/add-item">Add New Item</Link>
         </li>
       </ul>
