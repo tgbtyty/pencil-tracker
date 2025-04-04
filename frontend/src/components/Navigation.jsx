@@ -1,15 +1,24 @@
-import { Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { Link, useNavigate } from 'react-router-dom';
 import './Navigation.css';
 
 function Navigation() {
-  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  
+  // Check if user is logged in
+  const isLoggedIn = localStorage.getItem('token') !== null;
+  const userData = isLoggedIn ? JSON.parse(localStorage.getItem('user')) : null;
+  
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/login');
+  };
 
   return (
     <nav className="navigation">
       <div className="nav-brand">Furniture Tracking System</div>
       
-      {user ? (
+      {isLoggedIn ? (
         <>
           <ul className="nav-links">
             <li>
@@ -19,16 +28,13 @@ function Navigation() {
               <Link to="/furniture">Inventory</Link>
             </li>
             <li>
-              <Link to="/furniture/retired">Retired Items</Link>
-            </li>
-            <li>
               <Link to="/add-item">Add New Item</Link>
             </li>
           </ul>
           
           <div className="nav-user">
-            <span className="user-email">{user.email}</span>
-            <button onClick={logout} className="logout-btn">Logout</button>
+            <span className="user-email">{userData?.email}</span>
+            <button onClick={handleLogout} className="logout-btn">Logout</button>
           </div>
         </>
       ) : (

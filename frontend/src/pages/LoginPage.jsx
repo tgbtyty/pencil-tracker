@@ -23,19 +23,24 @@ function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
       
-      const data = await response.json();
-      
       if (!response.ok) {
+        const data = await response.json();
         throw new Error(data.message || 'Failed to login');
       }
       
-      // Save token in localStorage
+      const data = await response.json();
+      
+      // Save token and user data to localStorage
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      
+      // Add this console log to debug
+      console.log('Login successful, redirecting to home page');
       
       // Redirect to home page
       navigate('/');
     } catch (err) {
+      console.error('Login error:', err);
       setError(err.message || 'Login failed. Please try again.');
     } finally {
       setIsLoading(false);
