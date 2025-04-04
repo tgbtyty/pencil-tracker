@@ -46,8 +46,8 @@ function App() {
             } />
             
             <Route path="/" element={
-              isAuthenticated() ? <Navigate to="/furniture" /> : <Navigate to="/login" />
-            } />
+  isAuthenticated() ? <HomePage /> : <Navigate to="/login" />
+} />
             
             <Route path="*" element={<Navigate to={isAuthenticated() ? "/furniture" : "/login"} />} />
           </Routes>
