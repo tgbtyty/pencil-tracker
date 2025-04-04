@@ -2,24 +2,36 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 // Helper function for API requests
+// Helper function for API requests
 async function fetchAPI(endpoint, options = {}) {
-  const url = `${API_URL}/${endpoint}`;
-  
-  const defaultOptions = {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  };
-  
-  const response = await fetch(url, { ...defaultOptions, ...options });
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'API request failed');
+    const url = `${API_URL}/${endpoint}`;
+    
+    const token = localStorage.getItem('token');
+    
+    const defaultOptions = {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+    };
+    
+    const response = await fetch(url, { ...defaultOptions, ...options });
+    
+    if (response.status === 401) {
+      // Unauthorized, clear token and redirect to login
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+      throw new Error('Session expired. Please login again.');
+    }
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'API request failed');
+    }
+    
+    return response.json();
   }
-  
-  return response.json();
-}
 
 // Get all detectors with their current item counts
 export function getDetectors() {

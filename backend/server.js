@@ -2,6 +2,11 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const { Pool } = require('pg');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
+
+// Secret key for JWT - in production, use environment variable
+const JWT_SECRET = process.env.JWT_SECRET || 'pencil-dogs-secret-key';
 
 // Initialize Express app
 const app = express();
@@ -189,7 +194,107 @@ app.get('/api/furniture', async (req, res) => {
       client.release();
     }
   });
+
+  // Get retired furniture items
+app.get('/api/furniture/retired', authMiddleware, async (req, res) => {
+    try {
+      const { rows } = await pool.query(`
+        SELECT f.id, f.name, f.description, fc.name as category, 
+               f.acquisition_date, f.retired_date, f.times_deployed, 
+               b.beacon_uuid, 
+               (SELECT s3_url FROM furniture_photos WHERE furniture_id = f.id LIMIT 1) as photo_url
+        FROM furniture f
+        LEFT JOIN furniture_categories fc ON f.category_id = fc.id
+        LEFT JOIN beacons b ON b.id = (
+          SELECT id FROM beacons 
+          WHERE current_furniture_id = f.id OR id IN (
+            SELECT beacon_id FROM deployment_history WHERE furniture_id = f.id
+          )
+          LIMIT 1
+        )
+        WHERE f.is_active = false
+        ORDER BY f.retired_date DESC
+      `);
+      res.json(rows);
+    } catch (error) {
+      console.error('Error fetching retired furniture:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
   
+// User Login
+app.post('/api/auth/login', async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      
+      // Find user by email
+      const { rows } = await pool.query(
+        'SELECT * FROM users WHERE email = $1',
+        [email]
+      );
+      
+      if (rows.length === 0) {
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+      
+      const user = rows[0];
+      
+      // Compare password
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      
+      if (!isValidPassword) {
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+      
+      // Generate JWT token
+      const token = jwt.sign(
+        { userId: user.id, email: user.email, role: user.role },
+        JWT_SECRET,
+        { expiresIn: '24h' }
+      );
+      
+      res.json({
+        message: 'Login successful',
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role
+        }
+      });
+      
+    } catch (error) {
+      console.error('Login error:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
+  
+  // Middleware to verify JWT token
+  const authMiddleware = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader) {
+      return res.status(401).json({ message: 'No token provided' });
+    }
+    
+    const token = authHeader.split(' ')[1];
+    
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      req.user = decoded;
+      next();
+    } catch (error) {
+      console.error('Token verification error:', error);
+      res.status(401).json({ message: 'Invalid or expired token' });
+    }
+  };
+  
+  // Protected route example
+  app.get('/api/auth/profile', authMiddleware, (req, res) => {
+    res.json({ user: req.user });
+  });
+
   // Delete/retire a furniture item
   app.delete('/api/furniture/:id', async (req, res) => {
     const client = await pool.connect();

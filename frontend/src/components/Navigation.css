@@ -54,3 +54,60 @@
       margin: 0;
     }
   }
+
+  /* Add these styles */
+.navigation {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--primary-color);
+    color: white;
+    padding: 1rem 2rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .nav-user {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+  }
+  
+  .user-email {
+    margin-right: 1rem;
+    color: white;
+    font-size: 0.9rem;
+  }
+  
+  .logout-btn {
+    background-color: transparent;
+    border: 1px solid white;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  
+  .logout-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  @media (max-width: 768px) {
+    .navigation {
+      flex-wrap: wrap;
+    }
+    
+    .nav-brand {
+      margin-bottom: 0.5rem;
+    }
+    
+    .nav-links {
+      order: 3;
+      width: 100%;
+      margin-top: 1rem;
+    }
+    
+    .nav-user {
+      order: 2;
+    }
+  }
