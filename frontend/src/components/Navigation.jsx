@@ -1,16 +1,32 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import './Navigation.css';
 
 function Navigation() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userData, setUserData] = useState(null);
   
-  // Check if user is logged in
-  const isLoggedIn = localStorage.getItem('token') !== null;
-  const userData = isLoggedIn ? JSON.parse(localStorage.getItem('user')) : null;
+  // Check auth status whenever location changes
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const user = localStorage.getItem('user');
+    
+    setIsLoggedIn(token !== null);
+    setUserData(user ? JSON.parse(user) : null);
+    
+    // Redirect to login if not authenticated
+    if (!token && location.pathname !== '/login') {
+      navigate('/login');
+    }
+  }, [location, navigate]);
   
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    setIsLoggedIn(false);
+    setUserData(null);
     navigate('/login');
   };
 

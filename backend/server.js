@@ -224,24 +224,21 @@ app.get('/api/furniture', async (req, res) => {
   });
 
   // Get retired furniture items
+// Get retired furniture items
 app.get('/api/furniture/retired', authMiddleware, async (req, res) => {
     try {
       const { rows } = await pool.query(`
         SELECT f.id, f.name, f.description, fc.name as category, 
                f.acquisition_date, f.retired_date, f.times_deployed, 
-               b.beacon_uuid, 
+               (SELECT beacon_uuid FROM beacons WHERE id = 
+                (SELECT MAX(b.id) FROM beacons b 
+                 LEFT JOIN deployment_history dh ON b.id = dh.beacon_id 
+                 WHERE dh.furniture_id = f.id)) as beacon_uuid,
                (SELECT s3_url FROM furniture_photos WHERE furniture_id = f.id LIMIT 1) as photo_url
         FROM furniture f
         LEFT JOIN furniture_categories fc ON f.category_id = fc.id
-        LEFT JOIN beacons b ON b.id = (
-          SELECT id FROM beacons 
-          WHERE current_furniture_id = f.id OR id IN (
-            SELECT beacon_id FROM deployment_history WHERE furniture_id = f.id
-          )
-          LIMIT 1
-        )
         WHERE f.is_active = false
-        ORDER BY f.retired_date DESC
+        ORDER BY f.retired_date DESC NULLS LAST
       `);
       res.json(rows);
     } catch (error) {

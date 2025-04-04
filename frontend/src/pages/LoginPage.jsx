@@ -23,19 +23,20 @@ function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
       
+      const data = await response.json();
+      
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(data.message || 'Failed to login');
       }
       
-      const data = await response.json();
-      
-      // Save token and user data to localStorage
+      // Save token and user data
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       
-      // Redirect to furniture inventory page
-      navigate('/furniture');
+      console.log('Login successful, navigating to /furniture');
+      
+      // Force navigation with a page reload to ensure state is refreshed
+      window.location.href = '/furniture';
     } catch (err) {
       console.error('Login error:', err);
       setError(err.message || 'Login failed. Please try again.');
