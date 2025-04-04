@@ -12,6 +12,34 @@ const JWT_SECRET = process.env.JWT_SECRET || 'pencil-dogs-secret-key';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// ADD THIS MIDDLEWARE DEFINITION HERE
+// Middleware to verify JWT token
+const authMiddleware = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader) {
+    return res.status(401).json({ message: 'No token provided' });
+  }
+  
+  const token = authHeader.split(' ')[1];
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    console.error('Token verification error:', error);
+    res.status(401).json({ message: 'Invalid or expired token' });
+  }
+};
+
+// Serve static frontend files
+app.use(express.static(path.join(__dirname, '../frontend/dist')));
+
 // Load environment variables
 require('dotenv').config();
 
