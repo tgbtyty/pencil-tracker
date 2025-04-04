@@ -129,6 +129,31 @@ app.get('/api/furniture', async (req, res) => {
       res.status(500).json({ message: 'Server error' });
     }
   });
+
+  app.get('/api/furniture/retired', authMiddleware, async (req, res) => {
+    try {
+      const { rows } = await pool.query(`
+        SELECT f.id, f.name, f.description, fc.name as category, 
+               f.acquisition_date, f.retired_date, f.times_deployed, 
+               b.beacon_uuid, 
+               (SELECT s3_url FROM furniture_photos WHERE furniture_id = f.id LIMIT 1) as photo_url
+        FROM furniture f
+        LEFT JOIN furniture_categories fc ON f.category_id = fc.id
+        LEFT JOIN beacons b ON b.id = (
+          SELECT beacon_id FROM deployment_history 
+          WHERE furniture_id = f.id 
+          ORDER BY deployed_at DESC 
+          LIMIT 1
+        )
+        WHERE f.is_active = false
+        ORDER BY COALESCE(f.retired_date, CURRENT_DATE) DESC
+      `);
+      res.json(rows);
+    } catch (error) {
+      console.error('Error fetching retired furniture:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
   
   // Get a specific furniture item
   app.get('/api/furniture/:id', async (req, res) => {
@@ -223,29 +248,7 @@ app.get('/api/furniture', async (req, res) => {
     }
   });
 
-  // Get retired furniture items
-// Get retired furniture items
-app.get('/api/furniture/retired', authMiddleware, async (req, res) => {
-    try {
-      const { rows } = await pool.query(`
-        SELECT f.id, f.name, f.description, fc.name as category, 
-               f.acquisition_date, f.retired_date, f.times_deployed, 
-               (SELECT beacon_uuid FROM beacons WHERE id = 
-                (SELECT MAX(b.id) FROM beacons b 
-                 LEFT JOIN deployment_history dh ON b.id = dh.beacon_id 
-                 WHERE dh.furniture_id = f.id)) as beacon_uuid,
-               (SELECT s3_url FROM furniture_photos WHERE furniture_id = f.id LIMIT 1) as photo_url
-        FROM furniture f
-        LEFT JOIN furniture_categories fc ON f.category_id = fc.id
-        WHERE f.is_active = false
-        ORDER BY f.retired_date DESC NULLS LAST
-      `);
-      res.json(rows);
-    } catch (error) {
-      console.error('Error fetching retired furniture:', error);
-      res.status(500).json({ message: 'Server error' });
-    }
-  });
+
   
 // User Login
 app.post('/api/auth/login', async (req, res) => {
