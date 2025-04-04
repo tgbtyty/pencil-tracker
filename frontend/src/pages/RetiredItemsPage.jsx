@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { format } from 'date-fns';
 import './RetiredItemsPage.css';
 
 function RetiredItemsPage() {
@@ -43,7 +42,8 @@ function RetiredItemsPage() {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    return format(new Date(dateString), 'MMM d, yyyy');
+    const date = new Date(dateString);
+    return date.toLocaleDateString();
   };
 
   if (loading) {

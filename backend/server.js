@@ -340,6 +340,47 @@ app.post('/api/auth/login', async (req, res) => {
       client.release();
     }
   });
+
+  // Initialize admin user (only use this in development)
+app.get('/api/init-admin-user', async (req, res) => {
+    try {
+      // Check if admin user already exists
+      const { rows: existingUsers } = await pool.query(
+        'SELECT * FROM users WHERE email = $1',
+        ['support@pencildogs.com']
+      );
+      
+      if (existingUsers.length > 0) {
+        return res.json({ message: 'Admin user already exists', userId: existingUsers[0].id });
+      }
+      
+      // Create users table if it doesn't exist
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS users (
+          id SERIAL PRIMARY KEY,
+          email VARCHAR(255) NOT NULL UNIQUE,
+          password VARCHAR(255) NOT NULL,
+          name VARCHAR(100),
+          role VARCHAR(50) DEFAULT 'user',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      
+      // Hash password
+      const hashedPassword = await bcrypt.hash('Pencil2025', 10);
+      
+      // Insert admin user
+      const { rows } = await pool.query(
+        'INSERT INTO users (email, password, name, role) VALUES ($1, $2, $3, $4) RETURNING id',
+        ['support@pencildogs.com', hashedPassword, 'Support User', 'admin']
+      );
+      
+      res.json({ message: 'Admin user created successfully', userId: rows[0].id });
+    } catch (error) {
+      console.error('Error creating admin user:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
   
   // List all beacons
   app.get('/api/beacons', async (req, res) => {
