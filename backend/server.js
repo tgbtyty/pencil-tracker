@@ -7,17 +7,28 @@ const { Pool } = require('pg');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Load environment variables
+require('dotenv').config();
+
+// Log connection details for debugging (you can remove this later)
+console.log('Attempting to connect to database with:', {
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  port: process.env.DB_PORT
+});
+// Database connection
 // Database connection
 const pool = new Pool({
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME || 'furniture_tracker',
-  user: process.env.DB_USER || 'admin',
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT || 5432,
-  ssl: {
-    rejectUnauthorized: false // For development only
-  }
-});
+    host: process.env.DB_HOST,
+    database: process.env.DB_NAME || 'furniture_tracker',
+    user: process.env.DB_USER || 'master',  // Changed default from 'admin' to 'master'
+    password: process.env.DB_PASSWORD,
+    port: process.env.DB_PORT || 5432,
+    ssl: {
+      rejectUnauthorized: false // For development only
+    }
+  });
 
 // Middleware
 app.use(cors());
