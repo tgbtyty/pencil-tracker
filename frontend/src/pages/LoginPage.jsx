@@ -34,11 +34,8 @@ function LoginPage() {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       
-      // Add this console log to debug
-      console.log('Login successful, redirecting to home page');
-      
-      // Redirect to home page
-      navigate('/');
+      // Redirect to furniture inventory page
+      navigate('/furniture');
     } catch (err) {
       console.error('Login error:', err);
       setError(err.message || 'Login failed. Please try again.');

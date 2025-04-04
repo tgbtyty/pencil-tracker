@@ -22,10 +22,10 @@ function Navigation() {
         <>
           <ul className="nav-links">
             <li>
-              <Link to="/">Home</Link>
+              <Link to="/furniture">Inventory</Link>
             </li>
             <li>
-              <Link to="/furniture">Inventory</Link>
+              <Link to="/furniture/retired">Retired Items</Link>
             </li>
             <li>
               <Link to="/add-item">Add New Item</Link>
