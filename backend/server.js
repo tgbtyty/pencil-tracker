@@ -298,45 +298,188 @@ app.post('/api/furniture/categories', async (req, res) => {
   }
 });
 
+// Validate a beacon UUID
 app.get('/api/beacons/validate/:uuid', async (req, res) => {
-  try {
-    const { uuid } = req.params;
-    const { rows } = await pool.query(
-      'SELECT * FROM beacons WHERE beacon_uuid = $1',
-      [uuid]
-    );
-    
-    if (rows.length === 0) {
-      return res.status(404).json({ message: 'Beacon not found' });
-    }
-    
-    const beacon = rows[0];
-    if (beacon.current_furniture_id) {
-      // Beacon is in use, get furniture details
-      const { rows: furnitureRows } = await pool.query(
-        'SELECT * FROM furniture WHERE id = $1',
-        [beacon.current_furniture_id]
-      );
+    try {
+      const { uuid } = req.params;
       
-      if (furnitureRows.length > 0) {
-        return res.json({
-          inUse: true,
-          furniture: furnitureRows[0]
+      // Check if the UUID contains the required phrase "PNCLDGS"
+      if (!uuid.includes('PNCLDGS')) {
+        return res.status(400).json({ 
+          valid: false,
+          message: 'Invalid beacon UUID format. UUID must contain PNCLDGS.' 
         });
       }
+      
+      // Check if the beacon already exists in the database
+      const { rows } = await pool.query(
+        'SELECT b.id, b.beacon_uuid, b.current_furniture_id, f.name as furniture_name ' +
+        'FROM beacons b ' +
+        'LEFT JOIN furniture f ON b.current_furniture_id = f.id ' +
+        'WHERE b.beacon_uuid = $1',
+        [uuid]
+      );
+      
+      if (rows.length === 0) {
+        // Beacon doesn't exist yet, we need to create it
+        const newBeacon = await pool.query(
+          'INSERT INTO beacons (beacon_uuid, is_active) VALUES ($1, true) RETURNING id',
+          [uuid]
+        );
+        
+        return res.json({ 
+          valid: true,
+          inUse: false,
+          beaconId: newBeacon.rows[0].id,
+          message: 'New beacon registered successfully'
+        });
+      }
+      
+      // Beacon exists
+      const beacon = rows[0];
+      
+      if (beacon.current_furniture_id) {
+        // Beacon is already in use
+        return res.json({
+          valid: true,
+          inUse: true,
+          beaconId: beacon.id,
+          furnitureId: beacon.current_furniture_id,
+          furnitureName: beacon.furniture_name,
+          message: `This beacon is currently used on: ${beacon.furniture_name}`
+        });
+      }
+      
+      // Beacon exists but is not in use
+      return res.json({
+        valid: true,
+        inUse: false,
+        beaconId: beacon.id,
+        message: 'Beacon is available for use'
+      });
+      
+    } catch (error) {
+      console.error('Error validating beacon:', error);
+      res.status(500).json({ message: 'Server error' });
     }
+  });
+  
+  // Retire furniture and free up the beacon
+  app.post('/api/furniture/retire/:id', async (req, res) => {
+    const client = await pool.connect();
     
-    // Beacon exists but not in use
-    res.json({
-      inUse: false,
-      beacon
-    });
+    try {
+      await client.query('BEGIN');
+      
+      const { id } = req.params;
+      
+      // Get the furniture and beacon details
+      const { rows } = await client.query(
+        'SELECT f.id, f.name, f.current_beacon_id, b.beacon_uuid ' +
+        'FROM furniture f ' +
+        'JOIN beacons b ON f.current_beacon_id = b.id ' +
+        'WHERE f.id = $1',
+        [id]
+      );
+      
+      if (rows.length === 0) {
+        return res.status(404).json({ message: 'Furniture not found' });
+      }
+      
+      const furniture = rows[0];
+      
+      // Mark furniture as retired
+      await client.query(
+        'UPDATE furniture SET is_active = false, retired_date = CURRENT_DATE, current_beacon_id = NULL WHERE id = $1',
+        [id]
+      );
+      
+      // Free up the beacon
+      await client.query(
+        'UPDATE beacons SET current_furniture_id = NULL WHERE id = $1',
+        [furniture.current_beacon_id]
+      );
+      
+      await client.query('COMMIT');
+      
+      res.json({
+        message: `Furniture "${furniture.name}" has been retired`,
+        beaconUUID: furniture.beacon_uuid
+      });
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error retiring furniture:', error);
+      res.status(500).json({ message: 'Server error' });
+    } finally {
+      client.release();
+    }
+  });
+  
+  // Add a new furniture item with an existing beacon
+  app.post('/api/furniture', async (req, res) => {
+    const client = await pool.connect();
     
-  } catch (error) {
-    console.error('Error validating beacon:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+    try {
+      await client.query('BEGIN');
+      
+      const { name, categoryId, description, beaconUUID } = req.body;
+      
+      // Check if the beacon exists
+      const { rows: beaconRows } = await client.query(
+        'SELECT id, current_furniture_id FROM beacons WHERE beacon_uuid = $1',
+        [beaconUUID]
+      );
+      
+      if (beaconRows.length === 0) {
+        return res.status(404).json({ message: 'Beacon not found' });
+      }
+      
+      const beacon = beaconRows[0];
+      
+      // If the beacon is associated with another furniture, check if it's been retired in the request
+      if (beacon.current_furniture_id) {
+        // This should be handled by the client - they should call /api/furniture/retire/:id first
+        return res.status(400).json({ 
+          message: 'Beacon is currently associated with another furniture item',
+          needsRetirement: true,
+          furnitureId: beacon.current_furniture_id
+        });
+      }
+      
+      // Insert the new furniture
+      const { rows: furnitureRows } = await client.query(
+        `INSERT INTO furniture 
+          (name, category_id, description, acquisition_date, times_deployed, is_active, current_beacon_id) 
+         VALUES 
+          ($1, $2, $3, CURRENT_DATE, 0, true, $4) 
+         RETURNING id`,
+        [name, categoryId, description, beacon.id]
+      );
+      
+      const furnitureId = furnitureRows[0].id;
+      
+      // Update the beacon to point to this furniture
+      await client.query(
+        'UPDATE beacons SET current_furniture_id = $1 WHERE id = $2',
+        [furnitureId, beacon.id]
+      );
+      
+      await client.query('COMMIT');
+      
+      res.status(201).json({ 
+        id: furnitureId,
+        message: 'Furniture item added successfully' 
+      });
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error adding furniture:', error);
+      res.status(500).json({ message: 'Server error' });
+    } finally {
+      client.release();
+    }
+  });
 
 // Catch-all route to serve the React app
 app.get('*', (req, res) => {

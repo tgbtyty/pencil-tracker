@@ -36,13 +36,13 @@ function AddItemForm({ onSubmit, isSubmitting }) {
       setValidationError('Please enter a beacon UUID');
       return;
     }
-
+  
     try {
       const response = await fetch(`/api/beacons/validate/${beaconUUID}`);
       
       if (!response.ok) {
         if (response.status === 404) {
-          setValidationError('Beacon not found. Please check the UUID.');
+          setValidationError('Beacon validation endpoint not found. Check server configuration.');
           return;
         }
         throw new Error('Failed to validate beacon');
@@ -50,9 +50,19 @@ function AddItemForm({ onSubmit, isSubmitting }) {
       
       const data = await response.json();
       
-      if (data.inUse) {
-        setValidationError('This beacon is already in use with another furniture item.');
+      if (!data.valid) {
+        setValidationError(data.message || 'Invalid beacon UUID');
         return;
+      }
+      
+      if (data.inUse) {
+        // Beacon is already in use, ask user if they want to retire the old furniture
+        if (window.confirm(`This beacon is currently used on: ${data.furnitureName}. Do you want to retire this item and reuse the beacon?`)) {
+          await retireFurniture(data.furnitureId);
+        } else {
+          setValidationError('Please use a different beacon');
+          return;
+        }
       }
       
       setBeaconValidated(true);
@@ -60,6 +70,31 @@ function AddItemForm({ onSubmit, isSubmitting }) {
     } catch (error) {
       console.error('Error validating beacon:', error);
       setValidationError('Error validating beacon. Please try again.');
+    }
+  };
+  
+  const retireFurniture = async (furnitureId) => {
+    try {
+      const response = await fetch(`/api/furniture/retire/${furnitureId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to retire furniture');
+      }
+      
+      const data = await response.json();
+      alert(data.message);
+      
+      // Now the beacon is available
+      setBeaconValidated(true);
+      setValidationError('');
+    } catch (error) {
+      console.error('Error retiring furniture:', error);
+      setValidationError('Failed to retire previous furniture. Please try again.');
     }
   };
 
