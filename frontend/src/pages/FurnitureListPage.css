@@ -1,3 +1,4 @@
+/* src/pages/FurnitureListPage.css */
 .furniture-list-page {
     padding: 1rem 0;
   }
@@ -6,17 +7,35 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  
+  .header-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+  
+  .search-container {
+    position: relative;
+  }
+  
+  .search-input {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    width: 250px;
   }
   
   .add-button {
     background-color: var(--accent-color);
     color: white;
-    padding: 10px 16px;
+    padding: 8px 16px;
     border-radius: 4px;
     text-decoration: none;
-    font-weight: 500;
-    transition: background-color 0.2s;
+    display: inline-block;
   }
   
   .add-button:hover {
@@ -24,84 +43,147 @@
     text-decoration: none;
   }
   
-  .furniture-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  .furniture-container {
+    display: flex;
     gap: 2rem;
   }
   
-  .furniture-card {
+  .furniture-list {
+    flex: 2;
+    overflow-x: auto;
+  }
+  
+  .furniture-list table {
+    width: 100%;
+    border-collapse: collapse;
     background-color: white;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     overflow: hidden;
-    transition: transform 0.3s, box-shadow 0.3s;
   }
   
-  .furniture-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  .furniture-list th,
+  .furniture-list td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #f0f0f0;
   }
   
-  .furniture-image {
-    height: 200px;
-    overflow: hidden;
-    background-color: #f0f0f0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .furniture-image img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  
-  .no-image {
-    color: #999;
-    font-style: italic;
-  }
-  
-  .furniture-details {
-    padding: 1rem;
-  }
-  
-  .furniture-details h2 {
-    margin-bottom: 0.5rem;
-    font-size: 1.3rem;
-  }
-  
-  .furniture-details p {
-    margin-bottom: 0.5rem;
-    color: #666;
-    font-size: 0.9rem;
-  }
-  
-  .furniture-actions {
-    display: flex;
-    padding: 0 1rem 1rem;
-    gap: 10px;
-  }
-  
-  .view-button, .delete-button {
-    padding: 8px 12px;
-    border-radius: 4px;
-    font-size: 0.9rem;
-    text-align: center;
-    flex: 1;
-  }
-  
-  .view-button {
+  .furniture-list th {
     background-color: var(--primary-color);
     color: white;
-    text-decoration: none;
+    font-weight: 500;
+  }
+  
+  .furniture-row {
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  
+  .furniture-row:hover {
+    background-color: #f5f5f5;
+  }
+  
+  .actions-cell {
+    white-space: nowrap;
   }
   
   .delete-button {
     background-color: var(--danger-color);
     color: white;
     border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+  
+  .furniture-detail {
+    flex: 1;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+    max-width: 400px;
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+  }
+  
+  .detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #f0f0f0;
+    padding-bottom: 1rem;
+  }
+  
+  .detail-header h2 {
+    margin: 0;
+    color: var(--primary-color);
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    color: #666;
+  }
+  
+  .close-btn:hover {
+    color: var(--danger-color);
+  }
+  
+  .detail-image {
+    margin-bottom: 1.5rem;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  
+  .detail-image img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  
+  .detail-content {
+    margin-bottom: 1.5rem;
+  }
+  
+  .detail-row {
+    margin-bottom: 0.8rem;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .detail-label {
+    font-weight: 500;
+    margin-bottom: 0.3rem;
+    color: #666;
+    font-size: 0.9rem;
+  }
+  
+  .detail-value {
+    color: #333;
+  }
+  
+  .detail-actions {
+    border-top: 1px solid #f0f0f0;
+    padding-top: 1.5rem;
+    display: flex;
+    justify-content: flex-end;
+  }
+  
+  .retire-btn {
+    background-color: var(--danger-color);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
     cursor: pointer;
   }
   
@@ -122,14 +204,34 @@
     color: var(--danger-color);
   }
   
-  @media (max-width: 768px) {
-    .furniture-grid {
-      grid-template-columns: 1fr;
+  @media (max-width: 992px) {
+    .furniture-container {
+      flex-direction: column;
     }
     
+    .furniture-detail {
+      max-width: 100%;
+      position: static;
+    }
+  }
+  
+  @media (max-width: 768px) {
     .page-header {
       flex-direction: column;
       align-items: flex-start;
-      gap: 1rem;
+    }
+    
+    .header-actions {
+      width: 100%;
+      flex-direction: column;
+      align-items: stretch;
+    }
+    
+    .search-input {
+      width: 100%;
+    }
+    
+    .add-button {
+      text-align: center;
     }
   }

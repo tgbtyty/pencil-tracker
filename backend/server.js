@@ -114,7 +114,7 @@ app.get('/api/furniture', async (req, res) => {
     try {
       const { rows } = await pool.query(`
         SELECT f.id, f.name, f.description, fc.name as category, 
-               f.acquisition_date, f.times_deployed, 
+               f.acquisition_date, f.times_deployed, f.last_location,
                b.beacon_uuid, 
                (SELECT s3_url FROM furniture_photos WHERE furniture_id = f.id LIMIT 1) as photo_url
         FROM furniture f
@@ -179,6 +179,11 @@ app.get('/api/furniture', async (req, res) => {
       
       const furniture = rows[0];
       furniture.photos = photoRows;
+      
+      // If last_location is null, default to 'Main Warehouse'
+      if (!furniture.last_location) {
+        furniture.last_location = 'Main Warehouse';
+      }
       
       res.json(furniture);
     } catch (error) {
@@ -635,6 +640,91 @@ app.get('/api/beacons/validate/:uuid', async (req, res) => {
     } catch (error) {
       await client.query('ROLLBACK');
       console.error('Error adding furniture:', error);
+      res.status(500).json({ message: 'Server error' });
+    } finally {
+      client.release();
+    }
+  });
+
+  app.put('/api/furniture/:id/location', authMiddleware, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { location } = req.body;
+      
+      if (!location || typeof location !== 'string') {
+        return res.status(400).json({ message: 'Valid location is required' });
+      }
+      
+      const { rows } = await pool.query(
+        'UPDATE furniture SET last_location = $1 WHERE id = $2 RETURNING id, name, last_location',
+        [location, id]
+      );
+      
+      if (rows.length === 0) {
+        return res.status(404).json({ message: 'Furniture not found' });
+      }
+      
+      res.json({
+        message: 'Location updated successfully',
+        furniture: rows[0]
+      });
+      
+    } catch (error) {
+      console.error('Error updating furniture location:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
+
+  // Permanently delete a retired furniture item
+app.delete('/api/furniture/permanent-delete/:id', authMiddleware, async (req, res) => {
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      const { id } = req.params;
+      
+      // First check if the item is already retired
+      const { rows } = await client.query(
+        'SELECT is_active FROM furniture WHERE id = $1',
+        [id]
+      );
+      
+      if (rows.length === 0) {
+        return res.status(404).json({ message: 'Furniture not found' });
+      }
+      
+      if (rows[0].is_active) {
+        return res.status(400).json({ 
+          message: 'Cannot permanently delete active furniture. Retire it first.' 
+        });
+      }
+      
+      // Delete furniture photos
+      await client.query(
+        'DELETE FROM furniture_photos WHERE furniture_id = $1',
+        [id]
+      );
+      
+      // Delete from deployment history
+      await client.query(
+        'DELETE FROM deployment_history WHERE furniture_id = $1',
+        [id]
+      );
+      
+      // Finally delete the furniture item
+      await client.query(
+        'DELETE FROM furniture WHERE id = $1',
+        [id]
+      );
+      
+      await client.query('COMMIT');
+      
+      res.json({ message: 'Furniture permanently deleted' });
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error permanently deleting furniture:', error);
       res.status(500).json({ message: 'Server error' });
     } finally {
       client.release();

@@ -1,3 +1,4 @@
+// src/pages/RetiredItemsPage.jsx
 import { useState, useEffect } from 'react';
 import './RetiredItemsPage.css';
 
@@ -40,6 +41,37 @@ function RetiredItemsPage() {
     }
   };
 
+  const handlePermanentDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to permanently delete this item? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+      
+      const response = await fetch(`/api/furniture/permanent-delete/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete item');
+      }
+      
+      // Remove the item from the list
+      setRetiredItems(retiredItems.filter(item => item.id !== id));
+      
+    } catch (err) {
+      console.error('Error deleting item:', err);
+      alert('Failed to delete item. Please try again.');
+    }
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
@@ -74,6 +106,8 @@ function RetiredItemsPage() {
                 <th>Retirement Date</th>
                 <th>Times Used</th>
                 <th>Last Beacon</th>
+                <th>Last Location</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -85,6 +119,16 @@ function RetiredItemsPage() {
                   <td>{formatDate(item.retired_date)}</td>
                   <td>{item.times_deployed}</td>
                   <td>{item.beacon_uuid || 'Unknown'}</td>
+                  <td>{item.last_location || 'Main Warehouse'}</td>
+                  <td>
+                    <button 
+                      onClick={() => handlePermanentDelete(item.id)}
+                      className="delete-btn"
+                      title="Permanently delete this item"
+                    >
+                      Delete
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
