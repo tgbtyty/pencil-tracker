@@ -147,7 +147,8 @@ function AddItemForm({ onSubmit, isSubmitting }) {
     setImagePreviewUrls(previewUrls);
   };
 
-  const handleSubmit = async (e) => {
+// Modified handleSubmit function for AddItemForm
+const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!beaconValidated) {
@@ -165,16 +166,21 @@ function AddItemForm({ onSubmit, isSubmitting }) {
       return;
     }
     
-    const formData = new FormData();
-    formData.append('name', name);
-    formData.append('categoryId', category);
-    formData.append('description', description);
-    formData.append('beaconUUID', beaconUUID);
+    // Check if there are no images and confirm with user
+    if (images.length === 0) {
+      const confirmed = window.confirm('No images have been selected. Do you want to continue without adding photos?');
+      if (!confirmed) {
+        return; // User canceled, don't proceed
+      }
+    }
     
-    // Append images to the FormData object
-    images.forEach((image, index) => {
-      formData.append('images', image);
-    });
+    // For now, just submit without images
+    const formData = {
+      name,
+      categoryId: category,
+      description,
+      beaconUUID
+    };
     
     try {
       await onSubmit(formData);

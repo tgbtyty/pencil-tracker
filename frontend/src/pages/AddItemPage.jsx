@@ -17,12 +17,14 @@ function AddItemPage() {
         throw new Error('Not authenticated');
       }
       
+      // For now, submit as regular JSON
       const response = await fetch('/api/furniture', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         },
-        body: formData // Send the FormData directly for multipart/form-data
+        body: JSON.stringify(formData)
       });
       
       if (!response.ok) {
