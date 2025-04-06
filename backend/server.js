@@ -16,6 +16,46 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+const AWS = require('aws-sdk');
+const multer = require('multer');
+const multerS3 = require('multer-s3');
+const { v4: uuidv4 } = require('uuid');
+
+// Configure AWS
+AWS.config.update({
+  region: process.env.AWS_REGION || 'us-east-2',
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+});
+
+const s3 = new AWS.S3();
+
+// Configure multer for S3 upload
+const upload = multer({
+  storage: multerS3({
+    s3: s3,
+    bucket: process.env.AWS_S3_BUCKET || 'furniture-tracking-photos-pencil-tracker',
+    acl: 'public-read',
+    metadata: function (req, file, cb) {
+      cb(null, { fieldName: file.fieldname });
+    },
+    key: function (req, file, cb) {
+      const fileExtension = file.originalname.split('.').pop();
+      cb(null, `furniture/${uuidv4()}.${fileExtension}`);
+    }
+  }),
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: function (req, file, cb) {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
+
 // ADD THIS MIDDLEWARE DEFINITION HERE
 // Middleware to verify JWT token
 const authMiddleware = (req, res, next) => {
@@ -192,11 +232,8 @@ app.get('/api/furniture', async (req, res) => {
     }
   });
   
-  // Add a new furniture item
-  app.post('/api/furniture', async (req, res) => {
-    // For now, we'll handle just the basic furniture data
-    // In a real implementation, you'd also handle file uploads to S3
-    
+// Add a new furniture item with image upload
+app.post('/api/furniture', upload.array('images', 5), async (req, res) => {
     const client = await pool.connect();
     
     try {
@@ -206,42 +243,70 @@ app.get('/api/furniture', async (req, res) => {
       
       // Check if the beacon exists and is available
       const { rows: beaconRows } = await client.query(
-        'SELECT id FROM beacons WHERE beacon_uuid = $1 AND current_furniture_id IS NULL',
+        'SELECT id, current_furniture_id FROM beacons WHERE beacon_uuid = $1',
         [beaconUUID]
       );
       
       if (beaconRows.length === 0) {
-        return res.status(400).json({ message: 'Beacon not found or already in use' });
+        return res.status(404).json({ message: 'Beacon not found' });
       }
       
-      const beaconId = beaconRows[0].id;
+      const beacon = beaconRows[0];
       
-      // Insert new furniture item
-      const { rows } = await client.query(
-        `INSERT INTO furniture 
-          (name, category_id, description, acquisition_date, times_deployed, is_active, current_beacon_id) 
-         VALUES 
-          ($1, $2, $3, CURRENT_DATE, 0, true, $4) 
-         RETURNING id`,
-        [name, categoryId, description, beaconId]
+      // If the beacon is associated with another furniture, check if it's been retired in the request
+      if (beacon.current_furniture_id) {
+        // This should be handled by the client - they should call /api/furniture/retire/:id first
+        return res.status(400).json({ 
+          message: 'Beacon is currently associated with another furniture item',
+          needsRetirement: true,
+          furnitureId: beacon.current_furniture_id
+        });
+      }
+      
+      // Get the warehouse location from the detectors table
+      let warehouseLocation = 'Main Warehouse';
+      const { rows: warehouseRows } = await client.query(
+        "SELECT location_name FROM detectors WHERE name = 'Main Warehouse' LIMIT 1"
       );
       
-      const furnitureId = rows[0].id;
+      if (warehouseRows.length > 0) {
+        warehouseLocation = warehouseRows[0].location_name;
+      }
+      
+      // Insert the new furniture with the warehouse location
+      const { rows: furnitureRows } = await client.query(
+        `INSERT INTO furniture 
+          (name, category_id, description, acquisition_date, times_deployed, is_active, current_beacon_id, last_location) 
+         VALUES 
+          ($1, $2, $3, CURRENT_DATE, 0, true, $4, $5) 
+         RETURNING id`,
+        [name, categoryId, description, beacon.id, warehouseLocation]
+      );
+      
+      const furnitureId = furnitureRows[0].id;
       
       // Update the beacon to point to this furniture
       await client.query(
         'UPDATE beacons SET current_furniture_id = $1 WHERE id = $2',
-        [furnitureId, beaconId]
+        [furnitureId, beacon.id]
       );
       
-      // If there are photos, we'd handle S3 upload here
-      // For now, we'll just commit the transaction
+      // Process uploaded images if any
+      if (req.files && req.files.length > 0) {
+        for (const file of req.files) {
+          await client.query(
+            'INSERT INTO furniture_photos (furniture_id, s3_url, upload_date) VALUES ($1, $2, CURRENT_TIMESTAMP)',
+            [furnitureId, file.location]
+          );
+        }
+      }
       
       await client.query('COMMIT');
       
       res.status(201).json({ 
         id: furnitureId,
-        message: 'Furniture item added successfully' 
+        message: 'Furniture item added successfully',
+        images: req.files ? req.files.map(file => file.location) : []
       });
       
     } catch (error) {

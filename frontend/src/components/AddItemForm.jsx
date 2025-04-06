@@ -12,6 +12,7 @@ function AddItemForm({ onSubmit, isSubmitting }) {
   const [newCategory, setNewCategory] = useState('');
   const [showNewCategoryForm, setShowNewCategoryForm] = useState(false);
   const [validationError, setValidationError] = useState('');
+  const [imagePreviewUrls, setImagePreviewUrls] = useState([]);
 
   // Fetch categories when component mounts
   useEffect(() => {
@@ -36,13 +37,13 @@ function AddItemForm({ onSubmit, isSubmitting }) {
       setValidationError('Please enter a beacon UUID');
       return;
     }
-  
+
     try {
       const response = await fetch(`/api/beacons/validate/${beaconUUID}`);
       
       if (!response.ok) {
         if (response.status === 404) {
-          setValidationError('Beacon validation endpoint not found. Check server configuration.');
+          setValidationError('Beacon not found. Please check the UUID.');
           return;
         }
         throw new Error('Failed to validate beacon');
@@ -51,12 +52,11 @@ function AddItemForm({ onSubmit, isSubmitting }) {
       const data = await response.json();
       
       if (!data.valid) {
-        setValidationError(data.message || 'Invalid beacon UUID');
+        setValidationError(data.message || 'Invalid beacon UUID. Remember it must contain "PNCLDGS".');
         return;
       }
       
       if (data.inUse) {
-        // Beacon is already in use, ask user if they want to retire the old furniture
         if (window.confirm(`This beacon is currently used on: ${data.furnitureName}. Do you want to retire this item and reuse the beacon?`)) {
           await retireFurniture(data.furnitureId);
         } else {
@@ -72,7 +72,7 @@ function AddItemForm({ onSubmit, isSubmitting }) {
       setValidationError('Error validating beacon. Please try again.');
     }
   };
-  
+
   const retireFurniture = async (furnitureId) => {
     try {
       const response = await fetch(`/api/furniture/retire/${furnitureId}`, {
@@ -141,6 +141,10 @@ function AddItemForm({ onSubmit, isSubmitting }) {
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files);
     setImages(files);
+    
+    // Generate preview URLs for the selected images
+    const previewUrls = files.map(file => URL.createObjectURL(file));
+    setImagePreviewUrls(previewUrls);
   };
 
   const handleSubmit = async (e) => {
@@ -161,16 +165,23 @@ function AddItemForm({ onSubmit, isSubmitting }) {
       return;
     }
     
-    const formData = {
-      name,
-      categoryId: parseInt(category),
-      description,
-      beaconUUID,
-      images
-    };
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('categoryId', category);
+    formData.append('description', description);
+    formData.append('beaconUUID', beaconUUID);
+    
+    // Append images to the FormData object
+    images.forEach((image, index) => {
+      formData.append('images', image);
+    });
     
     try {
       await onSubmit(formData);
+      
+      // Clean up image preview URLs
+      imagePreviewUrls.forEach(url => URL.revokeObjectURL(url));
+      setImagePreviewUrls([]);
     } catch (error) {
       console.error('Error submitting form:', error);
       setValidationError('Failed to add item. Please try again.');
@@ -194,7 +205,8 @@ function AddItemForm({ onSubmit, isSubmitting }) {
               value={beaconUUID}
               onChange={(e) => setBeaconUUID(e.target.value)}
               disabled={beaconValidated}
-              placeholder="Enter beacon UUID"
+              placeholder="Enter beacon UUID (must contain PNCLDGS)"
+              className="beacon-uuid-input"
               required
             />
             {!beaconValidated && (
@@ -207,6 +219,11 @@ function AddItemForm({ onSubmit, isSubmitting }) {
               </button>
             )}
           </div>
+          {beaconValidated && (
+            <div className="validation-success">
+              ✓ Beacon validated successfully!
+            </div>
+          )}
         </div>
       </div>
 
@@ -285,12 +302,18 @@ function AddItemForm({ onSubmit, isSubmitting }) {
               onChange={handleImageUpload}
               multiple
               accept="image/*"
+              className="file-input"
             />
-            <div className="image-preview">
-              {images.length > 0 && (
-                <span>{images.length} files selected</span>
-              )}
-            </div>
+            
+            {imagePreviewUrls.length > 0 && (
+              <div className="image-preview-container">
+                {imagePreviewUrls.map((url, index) => (
+                  <div key={index} className="image-preview-item">
+                    <img src={url} alt={`Preview ${index + 1}`} />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           
           <div className="form-actions">

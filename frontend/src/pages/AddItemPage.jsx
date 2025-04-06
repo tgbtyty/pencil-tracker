@@ -12,23 +12,25 @@ function AddItemPage() {
     setIsSubmitting(true);
     
     try {
-      // For now, let's just handle the basic text data
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+      
       const response = await fetch('/api/furniture', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          name: formData.name,
-          categoryId: formData.categoryId,
-          description: formData.description,
-          beaconUUID: formData.beaconUUID
-        }),
+        body: formData // Send the FormData directly for multipart/form-data
       });
       
       if (!response.ok) {
-        throw new Error('Failed to create furniture item');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create furniture item');
       }
+      
+      const result = await response.json();
       
       setSubmitSuccess(true);
       
@@ -39,7 +41,7 @@ function AddItemPage() {
       
     } catch (error) {
       console.error('Error adding furniture:', error);
-      alert('Failed to add furniture item. Please try again.');
+      alert('Failed to add furniture item: ' + error.message);
     } finally {
       setIsSubmitting(false);
     }

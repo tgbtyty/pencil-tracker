@@ -1,61 +1,176 @@
-/* AddItemForm.css */
+/* src/components/AddItemForm.css */
 .add-item-form {
-    background-color: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    padding: 2rem;
-  }
-  
-  .form-section {
-    margin-bottom: 2rem;
-  }
-  
-  .form-section h2 {
-    margin-bottom: 1.5rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid #f0f0f0;
-  }
-  
-  .form-group {
-    margin-bottom: 1.5rem;
-  }
-  
-  .form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-  }
-  
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 2rem;
+}
+
+.validation-error {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 0.75rem;
+  margin-bottom: 1.5rem;
+  border-radius: 4px;
+  border: 1px solid #f5c6cb;
+}
+
+.validation-success {
+  background-color: #d4edda;
+  color: #155724;
+  padding: 0.5rem;
+  margin-top: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #c3e6cb;
+}
+
+.form-section {
+  margin-bottom: 2rem;
+}
+
+.form-section h2 {
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f0f0f0;
+  color: var(--primary-color);
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.beacon-input {
+  display: flex;
+  gap: 10px;
+}
+
+.beacon-uuid-input {
+  flex: 1;
+  font-size: 1.1rem;
+  padding: 10px 12px;
+  border: 2px solid #ddd;
+  border-radius: 4px;
+  transition: border-color 0.2s;
+}
+
+.beacon-uuid-input:focus {
+  border-color: var(--primary-color);
+  outline: none;
+}
+
+.beacon-uuid-input:disabled {
+  background-color: #f5f5f5;
+  border-color: #ddd;
+  color: #666;
+}
+
+.validate-btn {
+  background-color: var(--primary-color);
+  color: white;
+  padding: 0 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.validate-btn:hover {
+  background-color: var(--secondary-color);
+}
+
+.new-category-form {
+  background-color: #f9f9f9;
+  padding: 1rem;
+  border-radius: 4px;
+  margin-top: -0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.new-category-input {
+  display: flex;
+  gap: 10px;
+}
+
+.new-category-input input {
+  flex: 1;
+}
+
+.add-category-btn {
+  background-color: var(--secondary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0 16px;
+  cursor: pointer;
+}
+
+.image-preview-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 1rem;
+}
+
+.image-preview-item {
+  width: 100px;
+  height: 100px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #ddd;
+}
+
+.image-preview-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.file-input {
+  border: 1px solid #ddd;
+  padding: 8px;
+  border-radius: 4px;
+  width: 100%;
+}
+
+.form-actions {
+  margin-top: 2rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.submit-btn {
+  background-color: var(--accent-color);
+  color: white;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.submit-btn:hover {
+  background-color: #40b090;
+}
+
+.submit-btn:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
   .beacon-input {
-    display: flex;
-    gap: 10px;
-  }
-  
-  .beacon-input input {
-    flex: 1;
+    flex-direction: column;
   }
   
   .validate-btn {
-    background-color: var(--secondary-color);
+    align-self: flex-start;
   }
-  
-  .image-preview {
-    margin-top: 0.5rem;
-    color: #666;
-  }
-  
-  .form-actions {
-    margin-top: 2rem;
-    display: flex;
-    justify-content: flex-end;
-  }
-  
-  .submit-btn {
-    background-color: var(--accent-color);
-    padding: 10px 20px;
-    font-size: 1.1rem;
-  }
-  
-  .submit-btn:hover {
-    background-color: #40b090;
-  }
+}
