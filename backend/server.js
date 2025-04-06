@@ -195,17 +195,44 @@ app.get('/api/furniture', async (req, res) => {
     }
   });
   
-  // Get a specific furniture item
-  app.get('/api/furniture/:id', async (req, res) => {
+// Update the specific item endpoint to handle retired items
+app.get('/api/furniture/:id', async (req, res) => {
     try {
       const { id } = req.params;
-      const { rows } = await pool.query(`
-        SELECT f.*, fc.name as category_name, b.beacon_uuid
+      const isRetired = req.query.retired === 'true';
+      
+      let query = `
+        SELECT f.*, fc.name as category_name
         FROM furniture f
         LEFT JOIN furniture_categories fc ON f.category_id = fc.id
-        LEFT JOIN beacons b ON f.current_beacon_id = b.id
         WHERE f.id = $1
-      `, [id]);
+      `;
+      
+      // If it's a retired item, we won't have a current_beacon_id
+      if (!isRetired) {
+        query = `
+          SELECT f.*, fc.name as category_name, b.beacon_uuid
+          FROM furniture f
+          LEFT JOIN furniture_categories fc ON f.category_id = fc.id
+          LEFT JOIN beacons b ON f.current_beacon_id = b.id
+          WHERE f.id = $1
+        `;
+      } else {
+        // For retired items, try to get the last beacon used
+        query = `
+          SELECT f.*, fc.name as category_name,
+            (SELECT beacon_uuid FROM beacons WHERE id IN (
+              SELECT DISTINCT beacon_id FROM deployment_history 
+              WHERE furniture_id = f.id
+              ORDER BY deployed_at DESC LIMIT 1
+            )) as beacon_uuid
+          FROM furniture f
+          LEFT JOIN furniture_categories fc ON f.category_id = fc.id
+          WHERE f.id = $1
+        `;
+      }
+      
+      const { rows } = await pool.query(query, [id]);
       
       if (rows.length === 0) {
         return res.status(404).json({ message: 'Furniture not found' });

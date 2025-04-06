@@ -1,7 +1,17 @@
-// src/pages/FurnitureListPage.jsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { MapContainer, TileLayer, Marker, Circle, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 import './FurnitureListPage.css';
+
+// Fix Leaflet icon issue
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
 
 function FurnitureListPage() {
   const [furniture, setFurniture] = useState([]);
@@ -10,8 +20,22 @@ function FurnitureListPage() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Default warehouse location
+  const warehouseLocation = {
+    lat: 37.299250,
+    lng: -121.872694
+  };
+
   useEffect(() => {
     fetchFurniture();
+    
+    // Load warehouse location from localStorage if available
+    const savedLocation = localStorage.getItem('warehouseLocation');
+    if (savedLocation) {
+      const parsed = JSON.parse(savedLocation);
+      warehouseLocation.lat = parsed.lat;
+      warehouseLocation.lng = parsed.lng;
+    }
   }, []);
 
   const fetchFurniture = async () => {
@@ -116,6 +140,12 @@ function FurnitureListPage() {
     return date.toLocaleDateString();
   };
   
+  // Function to get photos for an item - returns an array of photo URLs
+  const getItemPhotos = (item) => {
+    if (!item || !item.photos) return [];
+    return item.photos.map(photo => photo.s3_url);
+  };
+  
   const filteredFurniture = furniture.filter(item => 
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (item.category && item.category.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -192,11 +222,18 @@ function FurnitureListPage() {
                 <button onClick={closeDetailView} className="close-btn">×</button>
               </div>
               
-              {selectedItem.photo_url && (
-                <div className="detail-image">
-                  <img src={selectedItem.photo_url} alt={selectedItem.name} />
-                </div>
-              )}
+              {/* Show the image gallery */}
+              <div className="detail-image-gallery">
+                {selectedItem.photos && selectedItem.photos.length > 0 ? (
+                  selectedItem.photos.map((photo, index) => (
+                    <div key={index} className="detail-image">
+                      <img src={photo.s3_url} alt={`${selectedItem.name} ${index + 1}`} />
+                    </div>
+                  ))
+                ) : (
+                  <div className="no-images">No images available</div>
+                )}
+              </div>
               
               <div className="detail-content">
                 <div className="detail-row">
@@ -225,8 +262,46 @@ function FurnitureListPage() {
                 </div>
                 
                 <div className="detail-row">
-                  <span className="detail-label">Location:</span>
-                  <span className="detail-value">Main Warehouse</span>
+                  <span className="detail-label">Last Location:</span>
+                  <span className="detail-value">{selectedItem.last_location || 'Main Warehouse'}</span>
+                </div>
+              </div>
+              
+              {/* Add a map showing the item's location */}
+              <div className="detail-map">
+                <h3>Item Location</h3>
+                <div className="map-container">
+                  <MapContainer
+                    center={[warehouseLocation.lat, warehouseLocation.lng]}
+                    zoom={15}
+                    style={{ height: '200px', width: '100%' }}
+                  >
+                    <TileLayer
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    />
+                    
+                    <Marker position={[warehouseLocation.lat, warehouseLocation.lng]}>
+                      <Popup>
+                        <div>
+                          <strong>{selectedItem.last_location || 'Main Warehouse'}</strong><br />
+                          {selectedItem.name} is located here
+                        </div>
+                      </Popup>
+                    </Marker>
+                    
+                    {/* 300m radius around the location */}
+                    <Circle
+                      center={[warehouseLocation.lat, warehouseLocation.lng]}
+                      radius={300}
+                      pathOptions={{ 
+                        fillColor: 'blue', 
+                        fillOpacity: 0.1,
+                        color: 'blue',
+                        weight: 1
+                      }}
+                    />
+                  </MapContainer>
                 </div>
               </div>
               
