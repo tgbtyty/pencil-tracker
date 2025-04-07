@@ -824,67 +824,77 @@ app.delete('/api/furniture/permanent-delete/:id', authMiddleware, async (req, re
     }
   });
 
+// Add this to server.js
 app.post('/api/location_history/batch', authMiddleware, async (req, res) => {
     const client = await pool.connect();
     
     try {
       await client.query('BEGIN');
       
-      const { detector_id, detector_name, latitude, longitude, beacons, timestamp } = req.body;
-      const detectedAt = timestamp ? new Date(timestamp) : new Date();
-      
-      console.log('Received location update:', { 
-        detector_id, 
-        detector_name, 
-        latitude, 
-        longitude, 
-        beaconCount: beacons.length,
-        timestamp: detectedAt 
-      });
+      // Extract data from the request using the updated schema
+      const { detector_uuid, name, location_type, location_name, latitude, longitude, beacons, timestamp } = req.body;
+      const now = new Date();
       
       // Check if detector exists
       const { rows: detectorRows } = await client.query(
-        'SELECT detector_id FROM detectors WHERE detector_id = $1',
-        [detector_id]
+        'SELECT id FROM detectors WHERE detector_uuid = $1',
+        [detector_uuid]
       );
+      
+      let detectorId;
       
       if (detectorRows.length === 0) {
         // Create new detector
-        await client.query(
-          'INSERT INTO detectors (detector_id, name, location_type, latitude, longitude, active, last_heartbeat) VALUES ($1, $2, $3, $4, $5, true, $6)',
-          [detector_id, detector_name, 'mobile', latitude, longitude, detectedAt]
+        const { rows } = await client.query(
+          'INSERT INTO detectors (detector_uuid, name, location_type, location_name, latitude, longitude, last_reported, is_active) VALUES ($1, $2, $3, $4, $5, $6, NOW(), true) RETURNING id',
+          [detector_uuid, name, location_type, location_name, latitude, longitude]
         );
-        console.log(`Created new detector: ${detector_id}`);
+        detectorId = rows[0].id;
+        console.log(`Created new detector: ${detectorId} (${detector_uuid})`);
       } else {
         // Update existing detector
+        detectorId = detectorRows[0].id;
         await client.query(
-          'UPDATE detectors SET name = $2, latitude = $3, longitude = $4, last_heartbeat = $5 WHERE detector_id = $1',
-          [detector_id, detector_name, latitude, longitude, detectedAt]
+          'UPDATE detectors SET name = $2, location_name = $3, latitude = $4, longitude = $5, last_reported = NOW() WHERE id = $1',
+          [detectorId, name, location_name, latitude, longitude]
         );
-        console.log(`Updated detector: ${detector_id}`);
+        console.log(`Updated detector: ${detectorId} (${detector_uuid})`);
       }
       
       // Process each beacon
-      for (const beaconId of beacons) {
+      for (const beaconData of beacons) {
+        const beaconUuid = beaconData.beacon_uuid;
+        
         // Check if beacon exists
         const { rows: beaconRows } = await client.query(
-          'SELECT beacon_id FROM beacons WHERE beacon_id = $1',
-          [beaconId]
+          'SELECT id FROM beacons WHERE beacon_uuid = $1',
+          [beaconUuid]
         );
+        
+        let beaconId;
         
         if (beaconRows.length === 0) {
           // Create new beacon
-          await client.query(
-            'INSERT INTO beacons (beacon_id, status, notes) VALUES ($1, $2, $3)',
-            [beaconId, 'active', `Detected by mobile scanner ${detector_name}`]
+          const { rows } = await client.query(
+            'INSERT INTO beacons (beacon_uuid, is_active, last_seen_detector_id, last_seen_time) VALUES ($1, true, $2, NOW()) RETURNING id',
+            [beaconUuid, detectorId]
           );
-          console.log(`Created new beacon: ${beaconId}`);
+          beaconId = rows[0].id;
+          console.log(`Created new beacon: ${beaconId} (${beaconUuid})`);
+        } else {
+          // Update existing beacon
+          beaconId = beaconRows[0].id;
+          await client.query(
+            'UPDATE beacons SET last_seen_detector_id = $2, last_seen_time = NOW() WHERE id = $1',
+            [beaconId, detectorId]
+          );
+          console.log(`Updated beacon: ${beaconId} (${beaconUuid})`);
         }
         
         // Record location history
         await client.query(
-          'INSERT INTO location_history (beacon_id, detector_id, detected_at, signal_strength) VALUES ($1, $2, $3, $4)',
-          [beaconId, detector_id, detectedAt, null]  // We don't have signal strength
+          'INSERT INTO location_history (beacon_id, detector_id, recorded_at, signal_strength) VALUES ($1, $2, NOW(), $3)',
+          [beaconId, detectorId, beaconData.signal_strength || null]
         );
         console.log(`Recorded location for beacon: ${beaconId}`);
       }
@@ -894,7 +904,7 @@ app.post('/api/location_history/batch', authMiddleware, async (req, res) => {
       res.json({
         success: true,
         message: `Location data recorded for ${beacons.length} beacons`,
-        detectorId: detector_id
+        detectorId: detectorId
       });
       
     } catch (error) {
