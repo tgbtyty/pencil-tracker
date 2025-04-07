@@ -672,6 +672,7 @@ app.get('/api/beacons/validate/:uuid', async (req, res) => {
       client.release();
     }
   });
+
   
   // Add a new furniture item with an existing beacon
   app.post('/api/furniture', async (req, res) => {
@@ -820,6 +821,71 @@ app.delete('/api/furniture/permanent-delete/:id', authMiddleware, async (req, re
       res.status(500).json({ message: 'Server error' });
     } finally {
       client.release();
+    }
+  });
+
+  // Add this to your server.js
+app.post('/api/location_history/batch', authMiddleware, async (req, res) => {
+    try {
+      const { detector_id, detector_name, latitude, longitude, beacons, timestamp } = req.body;
+      
+      // First, ensure the detector exists or create it
+      let detector;
+      const { rows: existingDetectors } = await pool.query(
+        'SELECT * FROM detectors WHERE detector_id = $1',
+        [detector_id]
+      );
+      
+      if (existingDetectors.length === 0) {
+        // Create new detector
+        const { rows } = await pool.query(
+          'INSERT INTO detectors (detector_id, name, location_type, latitude, longitude, active, last_heartbeat) VALUES ($1, $2, $3, $4, $5, true, NOW()) RETURNING *',
+          [detector_id, detector_name, 'mobile', latitude, longitude]
+        );
+        detector = rows[0];
+      } else {
+        // Update existing detector
+        const { rows } = await pool.query(
+          'UPDATE detectors SET name = $2, latitude = $3, longitude = $4, last_heartbeat = NOW() WHERE detector_id = $1 RETURNING *',
+          [detector_id, detector_name, latitude, longitude]
+        );
+        detector = rows[0];
+      }
+      
+      // Now record beacon locations
+      const locationPromises = beacons.map(async (beaconId) => {
+        // Ensure this beacon exists
+        const { rows: existingBeacons } = await pool.query(
+          'SELECT * FROM beacons WHERE beacon_id = $1',
+          [beaconId]
+        );
+        
+        if (existingBeacons.length === 0) {
+          // Create new beacon
+          await pool.query(
+            'INSERT INTO beacons (beacon_id, status, notes) VALUES ($1, $2, $3)',
+            [beaconId, 'active', 'Detected by mobile scanner ' + detector_name]
+          );
+        }
+        
+        // Record location history
+        return pool.query(
+          'INSERT INTO location_history (beacon_id, detector_id, detected_at) VALUES ($1, $2, NOW())',
+          [beaconId, detector_id]
+        );
+      });
+      
+      await Promise.all(locationPromises);
+      
+      res.json({
+        message: 'Location data recorded successfully',
+        detector: detector,
+        beaconCount: beacons.length
+      });
+      
+    } catch (error) {
+      console.error('Error recording location data:', error);
+      res.status(500).json({ message: 'Server error' });
     }
   });
 
