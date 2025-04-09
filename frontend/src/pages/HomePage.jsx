@@ -223,59 +223,61 @@ function HomePage() {
           />
           
           {/* Display all detectors on the map */}
-          {detectors.map(detector => (
-            <div key={detector.id || 'warehouse'}>
-              <Marker 
-                position={[
-                  detector.latitude || detector.lat || warehouseLocation.lat, 
-                  detector.longitude || detector.lng || warehouseLocation.lng
-                ]}
-              >
-                <Popup>
-                  <div>
-                    <strong>{detector.name}</strong><br />
-                    Items: {detector.itemCount || 0}<br />
-                    Coordinates: {(detector.latitude || detector.lat).toFixed(6)}, 
-                               {(detector.longitude || detector.lng).toFixed(6)}
-                  </div>
-                </Popup>
-              </Marker>
-              
-              {/* 300m radius around each detector */}
-              <Circle
-                center={[
-                  detector.latitude || detector.lat || warehouseLocation.lat, 
-                  detector.longitude || detector.lng || warehouseLocation.lng
-                ]}
-                radius={300}
-                pathOptions={{ 
-                  fillColor: 'blue', 
-                  fillOpacity: 0.1,
-                  color: 'blue',
-                  weight: 1
-                }}
-              />
-            </div>
-          ))}
+{detectors.map(detector => {
+  // Extract latitude and longitude safely
+  const latitude = detector.latitude || detector.lat || warehouseLocation.lat;
+  const longitude = detector.longitude || detector.lng || warehouseLocation.lng;
+  
+  return (
+    <div key={detector.id || 'warehouse'}>
+      <Marker position={[latitude, longitude]}>
+        <Popup>
+          <div>
+            <strong>{detector.name}</strong><br />
+            Items: {detector.itemCount || 0}<br />
+            Coordinates: {Number(latitude).toFixed(6)}, {Number(longitude).toFixed(6)}
+          </div>
+        </Popup>
+      </Marker>
+      
+      {/* 300m radius around each detector */}
+      <Circle
+        center={[latitude, longitude]}
+        radius={300}
+        pathOptions={{ 
+          fillColor: 'blue', 
+          fillOpacity: 0.1,
+          color: 'blue',
+          weight: 1
+        }}
+      />
+    </div>
+  );
+})}
           
           {isEditingLocation && <MapClickHandler onLocationSet={handleLocationChange} />}
         </MapContainer>
       </div>
       
       <div className="detectors-grid">
-        {detectors.map(detector => (
-          <div key={detector.id || 'warehouse'} className="detector-card">
-            <h2>{detector.name}</h2>
-            <p>Type: {detector.locationType || 'warehouse'}</p>
-            <p>Location: {(detector.latitude || detector.lat).toFixed(6)}, 
-                        {(detector.longitude || detector.lng).toFixed(6)}</p>
-            <div className="item-count">
-              <span className="count">{detector.itemCount || furniture.length || 0}</span>
-              <span className="label">Items Detected</span>
-            </div>
-          </div>
-        ))}
+  {detectors.map(detector => {
+    // Extract latitude and longitude safely
+    const latitude = detector.latitude || detector.lat || warehouseLocation.lat;
+    const longitude = detector.longitude || detector.lng || warehouseLocation.lng;
+    
+    return (
+      <div key={detector.id || 'warehouse'} className="detector-card">
+        <h2>{detector.name}</h2>
+        <p>Type: {detector.locationType || 'warehouse'}</p>
+        <p>Location: {Number(latitude).toFixed(6)}, {Number(longitude).toFixed(6)}</p>
+        <div className="item-count">
+          <span className="count">{detector.itemCount || furniture.length || 0}</span>
+          <span className="label">Items Detected</span>
+        </div>
       </div>
+    );
+  })}
+</div>
     </div>
   );
 }

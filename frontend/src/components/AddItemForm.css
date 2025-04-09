@@ -1,5 +1,13 @@
 /* src/components/AddItemForm.css */
 .add-item-form {
+  box-sizing: border-box;
+}
+
+.add-item-form * {
+  box-sizing: border-box;
+}
+
+.add-item-form {
   background-color: white;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -50,17 +58,21 @@
   gap: 10px;
 }
 
-.beacon-uuid-input {
-  flex: 1;
-  font-size: 1rem;
-  padding: 10px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background-color: white;
-  color: black;
-  min-height: 40px;
+/* Beacon UUID input */
+.add-item-form .beacon-uuid-input {
+  display: block;
   width: 100%;
+  min-height: 40px;
+  padding: 10px 12px;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #333;
+  background-color: #fff;
+  border: 2px solid #ddd;
+  border-radius: 4px;
+  transition: border-color 0.2s;
 }
+
 
 .beacon-uuid-input:focus {
   border-color: var(--primary-color);
@@ -100,14 +112,17 @@
   gap: 10px;
 }
 
-.new-category-input input {
+.add-item-form .new-category-input input {
+  display: block;
   flex: 1;
+  min-height: 40px;
   padding: 10px 12px;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #333;
+  background-color: #fff;
   border: 1px solid #ddd;
   border-radius: 4px;
-  background-color: white;
-  color: black;
-  font-size: 1rem;
 }
 
 .add-category-btn {
@@ -183,14 +198,32 @@
     align-self: flex-start;
   }
 }
-.form-group input[type="text"],
-.form-group textarea,
-.form-group select {
+.add-item-form .form-group input[type="text"],
+.add-item-form .form-group input[type="email"],
+.add-item-form .form-group input[type="password"],
+.add-item-form .form-group input[type="number"],
+.add-item-form .form-group select,
+.add-item-form .form-group textarea {
+  display: block;
   width: 100%;
+  min-height: 40px;
   padding: 10px 12px;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #333;
+  background-color: #fff;
   border: 1px solid #ddd;
   border-radius: 4px;
-  background-color: white;
-  color: black;
-  font-size: 1rem;
+  box-shadow: none;
+  transition: border-color 0.2s;
+}
+
+.add-item-form .form-group input:focus,
+.add-item-form .form-group select:focus,
+.add-item-form .form-group textarea:focus,
+.add-item-form .beacon-uuid-input:focus,
+.add-item-form .new-category-input input:focus {
+  border-color: var(--primary-color);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(74, 111, 165, 0.2);
 }
