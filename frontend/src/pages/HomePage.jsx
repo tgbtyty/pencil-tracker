@@ -164,122 +164,125 @@ function HomePage() {
     return <div className="error">{error}</div>;
   }
 
-  return (
-    <div className="home-page">
-      <h1>Detector Locations</h1>
-      <p>Current locations of all detectors and item counts</p>
-      
-      <div className="location-controls">
-        <button 
-          onClick={() => setIsEditingLocation(!isEditingLocation)}
-          className="location-btn"
-        >
-          {isEditingLocation ? 'Cancel' : 'Set Warehouse Location'}
-        </button>
-        
-        {isEditingLocation && (
-          <form onSubmit={handleSubmitCoordinates} className="coordinates-form">
-            <div className="form-group">
-              <label>Latitude:</label>
-              <input 
-                type="text" 
-                value={newLat} 
-                onChange={(e) => setNewLat(e.target.value)}
-                placeholder="e.g. 37.299250"
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label>Longitude:</label>
-              <input 
-                type="text" 
-                value={newLng} 
-                onChange={(e) => setNewLng(e.target.value)}
-                placeholder="e.g. -121.872694"
-                required
-              />
-            </div>
-            <button type="submit" className="submit-btn">Update Location</button>
-          </form>
-        )}
-        
-        {isEditingLocation && (
-          <div className="map-help">
-            <p>You can also click directly on the map to set the warehouse location.</p>
-          </div>
-        )}
-      </div>
-      
-      <div className="map-container">
-        <MapContainer
-          center={[mapCenterLatitude, mapCenterLongitude]}
-          zoom={15}
-          style={{ height: '500px', width: '100%' }}
-          whenCreated={(map) => { mapRef.current = map; }}
-        >
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          />
-          
-          {/* Display all detectors on the map */}
-{detectors.map(detector => {
-  // Extract latitude and longitude safely
-  const latitude = detector.latitude || detector.lat || warehouseLocation.lat;
-  const longitude = detector.longitude || detector.lng || warehouseLocation.lng;
-  
-  return (
-    <div key={detector.id || 'warehouse'}>
-      <Marker position={[latitude, longitude]}>
-        <Popup>
-          <div>
-            <strong>{detector.name}</strong><br />
-            Items: {detector.itemCount || 0}<br />
-            Coordinates: {Number(latitude).toFixed(6)}, {Number(longitude).toFixed(6)}
-          </div>
-        </Popup>
-      </Marker>
-      
-      {/* 300m radius around each detector */}
-      <Circle
-        center={[latitude, longitude]}
-        radius={300}
-        pathOptions={{ 
-          fillColor: 'blue', 
-          fillOpacity: 0.1,
-          color: 'blue',
-          weight: 1
-        }}
-      />
-    </div>
-  );
-})}
-          
-          {isEditingLocation && <MapClickHandler onLocationSet={handleLocationChange} />}
-        </MapContainer>
-      </div>
-      
-      <div className="detectors-grid">
-  {detectors.map(detector => {
-    // Extract latitude and longitude safely
-    const latitude = detector.latitude || detector.lat || warehouseLocation.lat;
-    const longitude = detector.longitude || detector.lng || warehouseLocation.lng;
+// HomePage.jsx - update the return JSX part
+return (
+  <div className="home-page">
+    <h1>Detector Locations</h1>
+    <p>Current locations of all detectors and item counts</p>
     
-    return (
-      <div key={detector.id || 'warehouse'} className="detector-card">
-        <h2>{detector.name}</h2>
-        <p>Type: {detector.locationType || 'warehouse'}</p>
-        <p>Location: {Number(latitude).toFixed(6)}, {Number(longitude).toFixed(6)}</p>
-        <div className="item-count">
-          <span className="count">{detector.itemCount || furniture.length || 0}</span>
-          <span className="label">Items Detected</span>
+    <div className="location-controls">
+      <button 
+        onClick={() => setIsEditingLocation(!isEditingLocation)}
+        className="location-btn"
+      >
+        {isEditingLocation ? 'Cancel' : 'Set Warehouse Location'}
+      </button>
+      
+      {isEditingLocation && (
+        <form onSubmit={handleSubmitCoordinates} className="coordinates-form">
+          <div className="form-group">
+            <label>Latitude:</label>
+            <input 
+              type="text" 
+              value={newLat} 
+              onChange={(e) => setNewLat(e.target.value)}
+              placeholder="e.g. 37.299250"
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label>Longitude:</label>
+            <input 
+              type="text" 
+              value={newLng} 
+              onChange={(e) => setNewLng(e.target.value)}
+              placeholder="e.g. -121.872694"
+              required
+            />
+          </div>
+          <button type="submit" className="submit-btn">Update Location</button>
+        </form>
+      )}
+      
+      {isEditingLocation && (
+        <div className="map-help">
+          <p>You can also click directly on the map to set the warehouse location.</p>
         </div>
-      </div>
-    );
-  })}
-</div>
+      )}
     </div>
-  );
+    
+    <div className="map-container">
+      <MapContainer
+        center={[warehouseLocation.lat, warehouseLocation.lng]}
+        zoom={15}
+        style={{ height: '500px', width: '100%' }}
+        whenCreated={(map) => { mapRef.current = map; }}
+      >
+        <TileLayer
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        />
+        
+        {/* Display all detectors on the map */}
+        {detectors.map(detector => {
+          // Handle null or undefined values safely
+          const lat = Number(detector.latitude) || warehouseLocation.lat;
+          const lng = Number(detector.longitude) || warehouseLocation.lng;
+          const itemCount = Number(detector.itemCount) || 0;
+          
+          return (
+            <div key={detector.id || 'warehouse-default'}>
+              <Marker position={[lat, lng]}>
+                <Popup>
+                  <div>
+                    <strong>{detector.name}</strong><br />
+                    Items: {itemCount}<br />
+                    Coordinates: {lat.toFixed(6)}, {lng.toFixed(6)}
+                  </div>
+                </Popup>
+              </Marker>
+              
+              {/* 300m radius around each detector */}
+              <Circle
+                center={[lat, lng]}
+                radius={300}
+                pathOptions={{ 
+                  fillColor: 'blue', 
+                  fillOpacity: 0.1,
+                  color: 'blue',
+                  weight: 1
+                }}
+              />
+            </div>
+          );
+        })}
+        
+        {isEditingLocation && <MapClickHandler onLocationSet={handleLocationChange} />}
+      </MapContainer>
+    </div>
+    
+    <div className="detectors-grid">
+      {detectors.map(detector => {
+        // Handle null or undefined values safely
+        const lat = Number(detector.latitude) || warehouseLocation.lat;
+        const lng = Number(detector.longitude) || warehouseLocation.lng;
+        const itemCount = Number(detector.itemCount) || 0;
+        
+        return (
+          <div key={detector.id || 'warehouse-default'} className="detector-card">
+            <h2>{detector.name}</h2>
+            <p>Type: {detector.locationType || 'warehouse'}</p>
+            <p>Location: {lat.toFixed(6)}, {lng.toFixed(6)}</p>
+            <div className="item-count">
+              <span className="count">{itemCount}</span>
+              <span className="label">Items Detected</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+);
 }
 
 export default HomePage;

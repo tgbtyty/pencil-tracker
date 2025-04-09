@@ -110,62 +110,76 @@ app.use(express.json());
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
-// API routes
-// Get all detectors with item counts
+// Get all detectors with proper item counts
 app.get('/api/detectors', async (req, res) => {
-    try {
-      // First check if the table exists
-      const tableExists = await pool.query(`
-        SELECT EXISTS (
-          SELECT FROM information_schema.tables 
-          WHERE table_name = 'detectors'
-        )
-      `);
+  try {
+    // First check if the table exists
+    const tableExists = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'detectors'
+      )
+    `);
+    
+    if (!tableExists.rows[0].exists) {
+      // If table doesn't exist, return default warehouse
+      const warehouseLocation = {
+        id: 'warehouse-default',
+        name: 'Main Warehouse',
+        locationType: 'warehouse',
+        location_name: 'Main Warehouse',
+        latitude: 37.299250,
+        longitude: -121.872694,
+        itemCount: 0
+      };
       
-      if (!tableExists.rows[0].exists) {
-        // If table doesn't exist, return default warehouse
-        const warehouseLocation = {
-          id: 'warehouse-default',
-          name: 'Main Warehouse',
-          locationType: 'warehouse',
-          latitude: 37.299250,
-          longitude: -121.872694,
-          itemCount: 0
-        };
-        
-        return res.json([warehouseLocation]);
-      }
-      
-      // Get all detectors with counts
-      const { rows } = await pool.query(`
-        SELECT d.id, d.detector_uuid, d.name, d.location_type as "locationType", 
-               d.location_name as "locationName", d.latitude, d.longitude, 
-               COUNT(DISTINCT f.id) as "itemCount"
-        FROM detectors d
-        LEFT JOIN furniture f ON 
-          f.is_active = true
-        GROUP BY d.id
-        ORDER BY d.name
-      `);
-      
-      // If no detectors, add default warehouse
-      if (rows.length === 0) {
-        rows.push({
-          id: 'warehouse-default',
-          name: 'Main Warehouse',
-          locationType: 'warehouse',
-          latitude: 37.299250,
-          longitude: -121.872694,
-          itemCount: 0
-        });
-      }
-      
-      res.json(rows);
-    } catch (error) {
-      console.error('Error fetching detectors:', error);
-      res.status(500).json({ message: 'Server error' });
+      return res.json([warehouseLocation]);
     }
-  });
+    
+    // Get all active detectors
+    const { rows: detectors } = await pool.query(`
+      SELECT d.id, d.detector_uuid, d.name, d.location_type as "locationType", 
+             d.location_name as "locationName", d.latitude, d.longitude, d.last_reported
+      FROM detectors d
+      WHERE d.is_active = true
+      ORDER BY d.name
+    `);
+    
+    // For each detector, count furniture items currently at that detector
+    for (let detector of detectors) {
+      // Count furniture items whose beacons were last seen by this detector
+      // and the detection was recent (within the last 24 hours)
+      const { rows: countResult } = await pool.query(`
+        SELECT COUNT(DISTINCT f.id) as count
+        FROM furniture f
+        JOIN beacons b ON f.current_beacon_id = b.id
+        WHERE b.last_seen_detector_id = $1
+          AND b.last_seen_time > NOW() - INTERVAL '24 hours'
+          AND f.is_active = true
+      `, [detector.id]);
+      
+      detector.itemCount = parseInt(countResult[0].count) || 0;
+    }
+    
+    // If no detectors, add default warehouse
+    if (detectors.length === 0) {
+      detectors.push({
+        id: 'warehouse-default',
+        name: 'Main Warehouse',
+        locationType: 'warehouse',
+        locationName: 'Main Warehouse',
+        latitude: 37.299250,
+        longitude: -121.872694,
+        itemCount: 0
+      });
+    }
+    
+    res.json(detectors);
+  } catch (error) {
+    console.error('Error fetching detectors:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 app.get('/api/furniture/categories', async (req, res) => {
   try {
@@ -847,96 +861,144 @@ app.delete('/api/furniture/permanent-delete/:id', authMiddleware, async (req, re
   });
 
 // Add this to server.js
-app.post('/api/location_history/batch', authMiddleware, async (req, res) => {
-    const client = await pool.connect();
+app.post('/api/location_history/batch', async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
     
-    try {
-      await client.query('BEGIN');
+    // Extract data from the request
+    const { detector_uuid, name, location_type, location_name, latitude, longitude, beacons } = req.body;
+    
+    // Check if detector exists
+    const { rows: detectorRows } = await pool.query(
+      'SELECT id FROM detectors WHERE detector_uuid = $1',
+      [detector_uuid]
+    );
+    
+    let detectorId;
+    
+    if (detectorRows.length === 0) {
+      // Create new detector
+      const { rows } = await pool.query(
+        'INSERT INTO detectors (detector_uuid, name, location_type, location_name, latitude, longitude, last_reported, is_active) VALUES ($1, $2, $3, $4, $5, $6, NOW(), true) RETURNING id',
+        [detector_uuid, name, location_type, location_name, latitude, longitude]
+      );
+      detectorId = rows[0].id;
+    } else {
+      // Update existing detector
+      detectorId = detectorRows[0].id;
+      await client.query(
+        'UPDATE detectors SET name = $2, location_type = $3, location_name = $4, latitude = $5, longitude = $6, last_reported = NOW() WHERE id = $1',
+        [detectorId, name, location_type, location_name, latitude, longitude]
+      );
+    }
+    
+    // Process each beacon
+    const processedBeacons = [];
+    for (const beaconData of beacons) {
+      const beaconUuid = beaconData.beacon_uuid;
       
-      // Extract data from the request using the updated schema
-      const { detector_uuid, name, location_type, location_name, latitude, longitude, beacons, timestamp } = req.body;
-      const now = new Date();
-      
-      // Check if detector exists
-      const { rows: detectorRows } = await client.query(
-        'SELECT id FROM detectors WHERE detector_uuid = $1',
-        [detector_uuid]
+      // Check if beacon exists
+      const { rows: beaconRows } = await client.query(
+        'SELECT id, current_furniture_id FROM beacons WHERE beacon_uuid = $1',
+        [beaconUuid]
       );
       
-      let detectorId;
+      let beaconId;
+      let furnitureId = null;
       
-      if (detectorRows.length === 0) {
-        // Create new detector
+      if (beaconRows.length === 0) {
+        // Create new beacon
         const { rows } = await client.query(
-          'INSERT INTO detectors (detector_uuid, name, location_type, location_name, latitude, longitude, last_reported, is_active) VALUES ($1, $2, $3, $4, $5, $6, NOW(), true) RETURNING id',
-          [detector_uuid, name, location_type, location_name, latitude, longitude]
+          'INSERT INTO beacons (beacon_uuid, is_active, last_seen_detector_id, last_seen_time) VALUES ($1, true, $2, NOW()) RETURNING id',
+          [beaconUuid, detectorId]
         );
-        detectorId = rows[0].id;
-        console.log(`Created new detector: ${detectorId} (${detector_uuid})`);
+        beaconId = rows[0].id;
       } else {
-        // Update existing detector
-        detectorId = detectorRows[0].id;
+        // Update existing beacon
+        beaconId = beaconRows[0].id;
+        furnitureId = beaconRows[0].current_furniture_id;
+        
         await client.query(
-          'UPDATE detectors SET name = $2, location_name = $3, latitude = $4, longitude = $5, last_reported = NOW() WHERE id = $1',
-          [detectorId, name, location_name, latitude, longitude]
+          'UPDATE beacons SET last_seen_detector_id = $2, last_seen_time = NOW() WHERE id = $1',
+          [beaconId, detectorId]
         );
-        console.log(`Updated detector: ${detectorId} (${detector_uuid})`);
       }
       
-      // Process each beacon
-      for (const beaconData of beacons) {
-        const beaconUuid = beaconData.beacon_uuid;
-        
-        // Check if beacon exists
-        const { rows: beaconRows } = await client.query(
-          'SELECT id FROM beacons WHERE beacon_uuid = $1',
-          [beaconUuid]
+      // Record location history
+      await client.query(
+        'INSERT INTO location_history (beacon_id, detector_id, recorded_at, signal_strength) VALUES ($1, $2, NOW(), $3)',
+        [beaconId, detectorId, beaconData.signal_strength || null]
+      );
+      
+      // Update furniture location if this beacon is attached to furniture
+      if (furnitureId) {
+        // Get detector location_name
+        const { rows: detectorInfo } = await client.query(
+          'SELECT location_name FROM detectors WHERE id = $1',
+          [detectorId]
         );
         
-        let beaconId;
-        
-        if (beaconRows.length === 0) {
-          // Create new beacon
-          const { rows } = await client.query(
-            'INSERT INTO beacons (beacon_uuid, is_active, last_seen_detector_id, last_seen_time) VALUES ($1, true, $2, NOW()) RETURNING id',
-            [beaconUuid, detectorId]
-          );
-          beaconId = rows[0].id;
-          console.log(`Created new beacon: ${beaconId} (${beaconUuid})`);
-        } else {
-          // Update existing beacon
-          beaconId = beaconRows[0].id;
+        if (detectorInfo.length > 0) {
+          const locationName = detectorInfo[0].location_name;
+          
+          // Update furniture last_location
           await client.query(
-            'UPDATE beacons SET last_seen_detector_id = $2, last_seen_time = NOW() WHERE id = $1',
-            [beaconId, detectorId]
+            'UPDATE furniture SET last_location = $2 WHERE id = $1',
+            [furnitureId, locationName]
           );
-          console.log(`Updated beacon: ${beaconId} (${beaconUuid})`);
+          
+          // If the furniture was previously at the warehouse and is now elsewhere,
+          // increment times_deployed and add a deployment history entry
+          const { rows: furnitureInfo } = await client.query(
+            'SELECT id, last_location, times_deployed FROM furniture WHERE id = $1',
+            [furnitureId]
+          );
+          
+          if (furnitureInfo.length > 0 && 
+              (furnitureInfo[0].last_location === 'Main Warehouse' || 
+               furnitureInfo[0].last_location === null)) {
+            
+            // Increment times_deployed
+            await client.query(
+              'UPDATE furniture SET times_deployed = times_deployed + 1 WHERE id = $1',
+              [furnitureId]
+            );
+            
+            // Add deployment history entry
+            await client.query(
+              'INSERT INTO deployment_history (furniture_id, beacon_id, deployed_at, destination) VALUES ($1, $2, NOW(), $3)',
+              [furnitureId, beaconId, locationName]
+            );
+          }
         }
-        
-        // Record location history
-        await client.query(
-          'INSERT INTO location_history (beacon_id, detector_id, recorded_at, signal_strength) VALUES ($1, $2, NOW(), $3)',
-          [beaconId, detectorId, beaconData.signal_strength || null]
-        );
-        console.log(`Recorded location for beacon: ${beaconId}`);
       }
       
-      await client.query('COMMIT');
-      
-      res.json({
-        success: true,
-        message: `Location data recorded for ${beacons.length} beacons`,
-        detectorId: detectorId
+      processedBeacons.push({
+        beaconId,
+        beaconUuid,
+        furnitureId
       });
-      
-    } catch (error) {
-      await client.query('ROLLBACK');
-      console.error('Error recording location data:', error);
-      res.status(500).json({ message: 'Server error', error: error.message });
-    } finally {
-      client.release();
     }
-  });
+    
+    await client.query('COMMIT');
+    
+    res.json({
+      success: true,
+      message: `Location data recorded for ${processedBeacons.length} beacons`,
+      detectorId,
+      processedBeacons
+    });
+    
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error recording location data:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  } finally {
+    client.release();
+  }
+});
 
   // Add this to server.js
 app.post('/api/location_history/batch', authMiddleware, async (req, res) => {
