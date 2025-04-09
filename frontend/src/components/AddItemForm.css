@@ -52,11 +52,14 @@
 
 .beacon-uuid-input {
   flex: 1;
-  font-size: 1.1rem;
+  font-size: 1rem;
   padding: 10px 12px;
-  border: 2px solid #ddd;
+  border: 1px solid #ddd;
   border-radius: 4px;
-  transition: border-color 0.2s;
+  background-color: white;
+  color: black;
+  min-height: 40px;
+  width: 100%;
 }
 
 .beacon-uuid-input:focus {
@@ -99,6 +102,12 @@
 
 .new-category-input input {
   flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: white;
+  color: black;
+  font-size: 1rem;
 }
 
 .add-category-btn {
@@ -173,4 +182,15 @@
   .validate-btn {
     align-self: flex-start;
   }
+}
+.form-group input[type="text"],
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: white;
+  color: black;
+  font-size: 1rem;
 }

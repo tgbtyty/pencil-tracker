@@ -25,6 +25,7 @@ function MapClickHandler({ onLocationSet }) {
 }
 
 function HomePage() {
+  const [detectors, setDetectors] = useState([]);
   const [furniture, setFurniture] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -40,15 +41,17 @@ function HomePage() {
   const mapRef = useRef(null);
   
   useEffect(() => {
-    fetchFurniture();
     // Load warehouse location from localStorage if available
     const savedLocation = localStorage.getItem('warehouseLocation');
     if (savedLocation) {
       setWarehouseLocation(JSON.parse(savedLocation));
     }
+    
+    // Fetch detectors and furniture data
+    fetchData();
   }, []);
   
-  const fetchFurniture = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
       
@@ -57,22 +60,52 @@ function HomePage() {
         throw new Error('Not authenticated');
       }
       
-      const response = await fetch('/api/furniture', {
+      // Fetch detectors
+      const detectorsResponse = await fetch('/api/detectors', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       
-      if (!response.ok) {
+      if (!detectorsResponse.ok) {
+        throw new Error('Failed to fetch detectors');
+      }
+      
+      const detectorsData = await detectorsResponse.json();
+      
+      // If no detectors, create a default warehouse detector
+      if (detectorsData.length === 0) {
+        const warehouse = {
+          id: 'warehouse-default',
+          name: 'Main Warehouse',
+          locationType: 'warehouse',
+          latitude: warehouseLocation.lat,
+          longitude: warehouseLocation.lng,
+          itemCount: 0
+        };
+        setDetectors([warehouse]);
+      } else {
+        setDetectors(detectorsData);
+      }
+      
+      // Fetch furniture to count items
+      const furnitureResponse = await fetch('/api/furniture', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!furnitureResponse.ok) {
         throw new Error('Failed to fetch furniture');
       }
       
-      const data = await response.json();
-      setFurniture(data);
+      const furnitureData = await furnitureResponse.json();
+      setFurniture(furnitureData);
+      
       setError(null);
     } catch (err) {
-      console.error('Error fetching furniture:', err);
-      setError('Failed to load furniture items. Please try again later.');
+      console.error('Error fetching data:', err);
+      setError('Failed to load detector data. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -114,8 +147,14 @@ function HomePage() {
     setNewLng('');
   };
   
-  // Calculate the number of items in the warehouse (all furniture for now)
-  const warehouseItemCount = furniture.length;
+  // Use the warehouse location if no detectors available
+  const mapCenterLatitude = detectors.length > 0 
+    ? detectors[0].latitude || warehouseLocation.lat 
+    : warehouseLocation.lat;
+    
+  const mapCenterLongitude = detectors.length > 0 
+    ? detectors[0].longitude || warehouseLocation.lng 
+    : warehouseLocation.lng;
 
   if (loading) {
     return <div className="loading">Loading detector locations...</div>;
@@ -173,7 +212,7 @@ function HomePage() {
       
       <div className="map-container">
         <MapContainer
-          center={[warehouseLocation.lat, warehouseLocation.lng]}
+          center={[mapCenterLatitude, mapCenterLongitude]}
           zoom={15}
           style={{ height: '500px', width: '100%' }}
           whenCreated={(map) => { mapRef.current = map; }}
@@ -183,41 +222,59 @@ function HomePage() {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           />
           
-          <Marker position={[warehouseLocation.lat, warehouseLocation.lng]}>
-            <Popup>
-              <div>
-                <strong>{warehouseLocation.name}</strong><br />
-                Items: {warehouseItemCount}<br />
-                Coordinates: {warehouseLocation.lat.toFixed(6)}, {warehouseLocation.lng.toFixed(6)}
-              </div>
-            </Popup>
-          </Marker>
-          
-          {/* 300m radius around the warehouse */}
-          <Circle
-            center={[warehouseLocation.lat, warehouseLocation.lng]}
-            radius={300}
-            pathOptions={{ 
-              fillColor: 'blue', 
-              fillOpacity: 0.1,
-              color: 'blue',
-              weight: 1
-            }}
-          />
+          {/* Display all detectors on the map */}
+          {detectors.map(detector => (
+            <div key={detector.id || 'warehouse'}>
+              <Marker 
+                position={[
+                  detector.latitude || detector.lat || warehouseLocation.lat, 
+                  detector.longitude || detector.lng || warehouseLocation.lng
+                ]}
+              >
+                <Popup>
+                  <div>
+                    <strong>{detector.name}</strong><br />
+                    Items: {detector.itemCount || 0}<br />
+                    Coordinates: {(detector.latitude || detector.lat).toFixed(6)}, 
+                               {(detector.longitude || detector.lng).toFixed(6)}
+                  </div>
+                </Popup>
+              </Marker>
+              
+              {/* 300m radius around each detector */}
+              <Circle
+                center={[
+                  detector.latitude || detector.lat || warehouseLocation.lat, 
+                  detector.longitude || detector.lng || warehouseLocation.lng
+                ]}
+                radius={300}
+                pathOptions={{ 
+                  fillColor: 'blue', 
+                  fillOpacity: 0.1,
+                  color: 'blue',
+                  weight: 1
+                }}
+              />
+            </div>
+          ))}
           
           {isEditingLocation && <MapClickHandler onLocationSet={handleLocationChange} />}
         </MapContainer>
       </div>
       
       <div className="detectors-grid">
-        <div className="detector-card">
-          <h2>{warehouseLocation.name}</h2>
-          <p>Location: {warehouseLocation.lat.toFixed(6)}, {warehouseLocation.lng.toFixed(6)}</p>
-          <div className="item-count">
-            <span className="count">{warehouseItemCount}</span>
-            <span className="label">Items Detected</span>
+        {detectors.map(detector => (
+          <div key={detector.id || 'warehouse'} className="detector-card">
+            <h2>{detector.name}</h2>
+            <p>Type: {detector.locationType || 'warehouse'}</p>
+            <p>Location: {(detector.latitude || detector.lat).toFixed(6)}, 
+                        {(detector.longitude || detector.lng).toFixed(6)}</p>
+            <div className="item-count">
+              <span className="count">{detector.itemCount || furniture.length || 0}</span>
+              <span className="label">Items Detected</span>
+            </div>
           </div>
-        </div>
+        ))}
       </div>
     </div>
   );
